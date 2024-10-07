@@ -1,8 +1,10 @@
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.*;
+import javax.swing.table.JTableHeader;
 
 public class UserForm extends JFrame {
     // Fields for Sign-Up / Sign-In
@@ -25,9 +27,9 @@ public class UserForm extends JFrame {
 
         // Set frame properties
         setTitle("Online Compiler");
-        setSize(400, 450); // Increase size to accommodate changes
+        setSize(400, 450);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null); // Center the frame
+        setLocationRelativeTo(null);
         setVisible(true);
     }
 
@@ -50,7 +52,6 @@ public class UserForm extends JFrame {
 
     // Create Sign-Up form UI
     private void createSignupForm() {
-        // Clear the content pane
         getContentPane().removeAll();
 
         // Add a logo at the top
@@ -61,8 +62,8 @@ public class UserForm extends JFrame {
 
         // Panel to hold the form components
         JPanel formPanel = new JPanel(new GridLayout(7, 2, 10, 10));
-        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding around the form
-        formPanel.setBackground(new Color(242, 242, 242)); // Light background
+        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        formPanel.setBackground(new Color(242, 242, 242));
 
         JLabel firstNameLabel = new JLabel("First Name:");
         firstNameField = new JTextField(15);
@@ -77,7 +78,7 @@ public class UserForm extends JFrame {
         usernameField.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
 
         JLabel roleLabel = new JLabel("Are you a?");
-        String[] roles = {"Student", "Teacher", "Professional"}; // Added Admin role
+        String[] roles = {"Student", "Teacher", "Professional"};
         roleBox = new JComboBox<>(roles);
         roleBox.setBackground(Color.WHITE);
         roleBox.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
@@ -87,7 +88,7 @@ public class UserForm extends JFrame {
         passwordField.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
 
         JButton signUpButton = new JButton("Sign Up");
-        signUpButton.setBackground(new Color(66, 133, 244)); // Google-like blue button
+        signUpButton.setBackground(new Color(66, 133, 244));
         signUpButton.setForeground(Color.WHITE);
         signUpButton.setFocusPainted(false);
 
@@ -128,7 +129,6 @@ public class UserForm extends JFrame {
 
     // Create Sign-In form UI
     private void createSignInForm() {
-        // Clear the content pane
         getContentPane().removeAll();
 
         // Panel for logo
@@ -139,8 +139,8 @@ public class UserForm extends JFrame {
 
         // Panel to hold the components
         JPanel formPanel = new JPanel(new GridLayout(4, 2, 10, 10));
-        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding
-        formPanel.setBackground(new Color(242, 242, 242)); // Light background
+        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        formPanel.setBackground(new Color(242, 242, 242));
 
         JLabel usernameLabel = new JLabel("Username:");
         usernameField = new JTextField(15);
@@ -216,8 +216,8 @@ public class UserForm extends JFrame {
                         ps.setString(5, password);
                         ps.executeUpdate();
 
-                        JOptionPane.showMessageDialog(null, "Sign Up successful! You can now sign in.", "Success", JOptionPane.INFORMATION_MESSAGE);
-                        createSignInForm(); // Switch to sign-in form
+                        JOptionPane.showMessageDialog(null, "Sign-up successful! You can now sign in.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                        createSignInForm(); // Redirect to the sign-in form after successful sign-up
                     }
                 } catch (SQLException ex) {
                     ex.printStackTrace();
@@ -234,66 +234,84 @@ public class UserForm extends JFrame {
             String username = usernameField.getText();
             String password = new String(passwordField.getPassword());
 
-            try {
-                // Check if the user exists
-                PreparedStatement ps = conn.prepareStatement("SELECT role FROM users WHERE username = ? AND password = ?");
-                ps.setString(1, username);
-                ps.setString(2, password);
-                ResultSet rs = ps.executeQuery();
+            if (username.equals("admin") && password.equals("root")) {
+                // Show database table for admin
+                showDatabaseTable();
+            } else {
+                try {
+                    // Verify user credentials
+                    PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE username = ? AND password = ?");
+                    ps.setString(1, username);
+                    ps.setString(2, password);
+                    ResultSet rs = ps.executeQuery();
 
-                if (rs.next()) {
-                    String role = rs.getString("role");
-
-                    if (role.equals("Admin")) {
-                        // Admin logged in, show database contents
-                        showDatabaseContents();
+                    if (rs.next()) {
+                        JOptionPane.showMessageDialog(null, "Login successful!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                        showDatabaseTable();
                     } else {
-                        // Non-admin user logged in
-                        JOptionPane.showMessageDialog(null, "Sign In successful! Welcome, " + username + ".", "Success", JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(null, "Invalid username or password.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
-                } else {
-                    JOptionPane.showMessageDialog(null, "Invalid username or password.", "Error", JOptionPane.ERROR_MESSAGE);
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, "Error logging in: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                 }
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(null, "Error signing in: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
-    // Show database contents in a new window
-    private void showDatabaseContents() {
-        JFrame dataFrame = new JFrame("User Database");
-        dataFrame.setSize(600, 400);
-        dataFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        dataFrame.setLocationRelativeTo(null);
-
-        JTextArea textArea = new JTextArea();
-        textArea.setEditable(false);
+    // Display the database table
+    private void showDatabaseTable() {
+        getContentPane().removeAll();
 
         try {
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT * FROM users");
+            // Get data from the database
+            String[] columnNames = {"ID", "First Name", "Last Name", "Username", "Role"};
+            DefaultTableModel model = new DefaultTableModel(columnNames, 0);
+            PreparedStatement ps = conn.prepareStatement("SELECT * FROM users");
+            ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
-                int id = rs.getInt("id");
-                String firstName = rs.getString("first_name");
-                String lastName = rs.getString("last_name");
-                String username = rs.getString("username");
-                String role = rs.getString("role");
-                textArea.append("ID: " + id + ", Name: " + firstName + " " + lastName + ", Username: " + username + ", Role: " + role + "\n");
+                Object[] row = {
+                    rs.getInt("id"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getString("username"),
+                    rs.getString("role")
+                };
+                model.addRow(row);
             }
+
+            JTable table = new JTable(model);
+            table.setRowHeight(25); // Set row height for better visibility
+            table.setFont(new Font("Arial", Font.PLAIN, 14));
+            table.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+            table.setFillsViewportHeight(true);
+
+            // Set table header
+            JTableHeader header = table.getTableHeader();
+            header.setFont(new Font("Arial", Font.BOLD, 16));
+            header.setBackground(new Color(66, 133, 244));
+            header.setForeground(Color.WHITE);
+            header.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+
+            // Wrap the table in a scroll pane
+            JScrollPane scrollPane = new JScrollPane(table);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+            // Set layout and add components
+            getContentPane().setLayout(new BorderLayout());
+            getContentPane().add(scrollPane, BorderLayout.CENTER);
+            setTitle("User Database");
+            revalidate();
+            repaint();
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error retrieving data: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        dataFrame.add(scrollPane);
-        dataFrame.setVisible(true);
     }
 
     // Main method to launch the application
     public static void main(String[] args) {
-        new UserForm();
+        SwingUtilities.invokeLater(() -> new UserForm());
     }
 }
